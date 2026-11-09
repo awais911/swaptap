@@ -1,0 +1,170 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // User Profile Validation
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'email', 'referralCode', 'pointsBalance', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'referralCode', 'referredBy', 'chainReferralBy', 'pointsBalance', 'totalPointsEarned', 'totalPointsSpent', 'campaignsCount', 'tasksCompletedCount', 'referralsCount', 'chainReferralsCount', 'lastTaskCompletedAt', 'dailyTasksCount', 'dailyTasksDate', 'createdAt', 'updatedAt'])
+        && data.uid is string && data.uid.size() > 0 && data.uid.size() <= 128
+        && data.displayName is string && data.displayName.size() <= 100
+        && data.email is string && data.email.size() <= 200
+        && (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 500))
+        && data.referralCode is string && data.referralCode.size() <= 32
+        && (!('referredBy' in data) || (data.referredBy is string && data.referredBy.size() <= 128))
+        && (!('chainReferralBy' in data) || (data.chainReferralBy is string && data.chainReferralBy.size() <= 128))
+        && data.pointsBalance is number && data.pointsBalance >= 0
+        && (!('totalPointsEarned' in data) || (data.totalPointsEarned is number && data.totalPointsEarned >= 0))
+        && (!('totalPointsSpent' in data) || (data.totalPointsSpent is number && data.totalPointsSpent >= 0))
+        && (!('campaignsCount' in data) || (data.campaignsCount is number && data.campaignsCount >= 0))
+        && (!('tasksCompletedCount' in data) || (data.tasksCompletedCount is number && data.tasksCompletedCount >= 0))
+        && (!('referralsCount' in data) || (data.referralsCount is number && data.referralsCount >= 0))
+        && (!('chainReferralsCount' in data) || (data.chainReferralsCount is number && data.chainReferralsCount >= 0))
+        && (!('lastTaskCompletedAt' in data) || (data.lastTaskCompletedAt is string && data.lastTaskCompletedAt.size() <= 64))
+        && (!('dailyTasksCount' in data) || (data.dailyTasksCount is number && data.dailyTasksCount >= 0))
+        && (!('dailyTasksDate' in data) || (data.dailyTasksDate is string && data.dailyTasksDate.size() <= 32));
+    }
+
+    // Campaign Validation
+    function isValidCampaign(data) {
+      return data.keys().hasAll(['id', 'creatorId', 'platform', 'taskType', 'title', 'mediaUrl', 'targetCount', 'completedCount', 'pointsAllocated', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'creatorId', 'creatorName', 'creatorPhoto', 'platform', 'taskType', 'title', 'mediaUrl', 'targetCount', 'completedCount', 'pointsAllocated', 'status', 'dripFeedRate', 'dripFeedViewsPerHour', 'createdAt', 'updatedAt'])
+        && data.id is string && data.id.size() > 0 && data.id.size() <= 128
+        && data.creatorId is string && data.creatorId.size() > 0 && data.creatorId.size() <= 128
+        && (!('creatorName' in data) || (data.creatorName is string && data.creatorName.size() <= 100))
+        && (!('creatorPhoto' in data) || (data.creatorPhoto is string && data.creatorPhoto.size() <= 500))
+        && data.platform in ['youtube', 'tiktok', 'instagram']
+        && data.taskType in ['watch', 'subscribe']
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 200
+        && data.mediaUrl is string && data.mediaUrl.size() > 0 && data.mediaUrl.size() <= 1000
+        && data.targetCount is number && data.targetCount >= 1 && data.targetCount <= 10000
+        && data.completedCount is number && data.completedCount >= 0
+        && data.pointsAllocated is number && data.pointsAllocated >= 0
+        && data.status in ['active', 'completed', 'paused']
+        && (!('dripFeedRate' in data) || data.dripFeedRate in ['organic', 'steady', 'batch'])
+        && (!('dripFeedViewsPerHour' in data) || (data.dripFeedViewsPerHour is number && data.dripFeedViewsPerHour >= 1));
+    }
+
+    // Task Log Validation
+    function isValidTaskLog(data) {
+      return data.keys().hasAll(['id', 'campaignId', 'userId', 'taskType', 'pointsEarned', 'createdAt'])
+        && data.keys().hasOnly(['id', 'campaignId', 'userId', 'taskType', 'pointsEarned', 'createdAt'])
+        && data.id is string && data.id.size() > 0 && data.id.size() <= 128
+        && data.campaignId is string && data.campaignId.size() > 0 && data.campaignId.size() <= 128
+        && data.userId is string && data.userId.size() > 0 && data.userId.size() <= 128
+        && data.taskType in ['watch', 'subscribe']
+        && data.pointsEarned is number && data.pointsEarned >= 0 && data.pointsEarned <= 10;
+    }
+
+    // Transaction Validation
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['id', 'userId', 'type', 'points', 'description', 'createdAt'])
+        && data.keys().hasOnly(['id', 'userId', 'type', 'points', 'description', 'campaignId', 'createdAt'])
+        && data.id is string && data.id.size() > 0 && data.id.size() <= 128
+        && data.userId is string && data.userId.size() > 0 && data.userId.size() <= 128
+        && data.type in ['bonus', 'earn_watch', 'earn_subscribe', 'earn_referral', 'earn_chain_referral', 'spend_campaign']
+        && data.points is number
+        && data.description is string && data.description.size() <= 300
+        && (!('campaignId' in data) || (data.campaignId is string && data.campaignId.size() <= 128));
+    }
+
+    // Referral Validation with threshold fields
+    function isValidReferral(data) {
+      return data.keys().hasAll(['id', 'referrerId', 'refereeId', 'refereeName', 'level', 'pointsAwarded', 'status', 'createdAt'])
+        && data.keys().hasOnly(['id', 'referrerId', 'refereeId', 'refereeName', 'level', 'pointsAwarded', 'status', 'tasksRequired', 'tasksCompletedByReferee', 'createdAt', 'updatedAt'])
+        && data.id is string && data.id.size() > 0 && data.id.size() <= 128
+        && data.referrerId is string && data.referrerId.size() > 0 && data.referrerId.size() <= 128
+        && data.refereeId is string && data.refereeId.size() > 0 && data.refereeId.size() <= 128
+        && data.refereeName is string && data.refereeName.size() <= 100
+        && (data.level == 1 || data.level == 2)
+        && data.pointsAwarded is number && data.pointsAwarded >= 0 && data.pointsAwarded <= 2
+        && data.status in ['pending', 'active']
+        && (!('tasksRequired' in data) || (data.tasksRequired is number && data.tasksRequired >= 1))
+        && (!('tasksCompletedByReferee' in data) || (data.tasksCompletedByReferee is number && data.tasksCompletedByReferee >= 0));
+    }
+
+    // 1. Users collection
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().uid == userId;
+      allow update: if isSignedIn() && isValidUser(incoming()) && (
+        // Self profile update or points change
+        isOwner(userId) ||
+        // Other user awarding referral bonus or updating partner stats
+        (incoming().diff(existing()).affectedKeys().hasOnly(['pointsBalance', 'totalPointsEarned', 'referralsCount', 'chainReferralsCount', 'updatedAt']))
+      );
+      allow delete: if false;
+    }
+
+    // 2. Campaigns collection
+    match /campaigns/{campaignId} {
+      allow get, list: if true;
+      allow create: if isSignedIn() && isValidCampaign(incoming()) && incoming().creatorId == request.auth.uid;
+      allow update: if isSignedIn() && isValidCampaign(incoming()) && (
+        // Creator updates campaign settings/status
+        (incoming().creatorId == request.auth.uid && incoming().creatorId == existing().creatorId) ||
+        // Task completion increments completedCount or updates status to completed
+        (incoming().diff(existing()).affectedKeys().hasOnly(['completedCount', 'status', 'updatedAt'])
+          && incoming().creatorId == existing().creatorId)
+      );
+      allow delete: if isSignedIn() && existing().creatorId == request.auth.uid;
+    }
+
+    // 3. Tasks collection (claim logs)
+    match /tasks/{taskId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && isValidTaskLog(incoming()) && incoming().userId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // 4. Transactions collection (ledger)
+    match /transactions/{transactionId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && isValidTransaction(incoming());
+      allow update, delete: if false;
+    }
+
+    // 5. Referrals collection
+    match /referrals/{referralId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && isValidReferral(incoming()) && (incoming().refereeId == request.auth.uid || incoming().referrerId == request.auth.uid);
+      allow update: if isSignedIn() && isValidReferral(incoming()) && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'pointsAwarded', 'tasksCompletedByReferee', 'updatedAt'])
+      );
+      allow delete: if false;
+    }
+
+    // Connection test document
+    match /test/{docId} {
+      allow read, write: if isSignedIn();
+    }
+  }
+}

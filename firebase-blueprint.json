@@ -1,0 +1,125 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with wallet point balance, stats, and referral hierarchy",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "displayName": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 200 },
+        "photoURL": { "type": "string", "maxLength": 500 },
+        "referralCode": { "type": "string", "maxLength": 32 },
+        "referredBy": { "type": "string", "maxLength": 128 },
+        "chainReferralBy": { "type": "string", "maxLength": 128 },
+        "pointsBalance": { "type": "number" },
+        "totalPointsEarned": { "type": "number" },
+        "totalPointsSpent": { "type": "number" },
+        "campaignsCount": { "type": "number" },
+        "tasksCompletedCount": { "type": "number" },
+        "referralsCount": { "type": "number" },
+        "chainReferralsCount": { "type": "number" },
+        "lastTaskCompletedAt": { "type": "string", "format": "date-time" },
+        "dailyTasksCount": { "type": "number" },
+        "dailyTasksDate": { "type": "string", "maxLength": 32 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "email", "referralCode", "pointsBalance", "createdAt", "updatedAt"]
+    },
+    "Campaign": {
+      "title": "Campaign",
+      "description": "Content creator promotion campaign for views or subscribes",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "creatorId": { "type": "string", "maxLength": 128 },
+        "creatorName": { "type": "string", "maxLength": 100 },
+        "creatorPhoto": { "type": "string", "maxLength": 500 },
+        "platform": { "type": "string", "enum": ["youtube", "tiktok", "instagram"] },
+        "taskType": { "type": "string", "enum": ["watch", "subscribe"] },
+        "title": { "type": "string", "maxLength": 200 },
+        "mediaUrl": { "type": "string", "maxLength": 1000 },
+        "targetCount": { "type": "number" },
+        "completedCount": { "type": "number" },
+        "pointsAllocated": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "completed", "paused"] },
+        "dripFeedRate": { "type": "string", "enum": ["organic", "steady", "batch"] },
+        "dripFeedViewsPerHour": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "creatorId", "platform", "taskType", "title", "mediaUrl", "targetCount", "completedCount", "pointsAllocated", "status", "createdAt", "updatedAt"]
+    },
+    "TaskLog": {
+      "title": "TaskLog",
+      "description": "Log of a task performed by a user on a campaign to prevent duplicate rewards",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "campaignId": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "taskType": { "type": "string", "enum": ["watch", "subscribe"] },
+        "pointsEarned": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "campaignId", "userId", "taskType", "pointsEarned", "createdAt"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Audit log of points earned or spent in wallet",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "type": { "type": "string", "enum": ["bonus", "earn_watch", "earn_subscribe", "earn_referral", "earn_chain_referral", "spend_campaign"] },
+        "points": { "type": "number" },
+        "description": { "type": "string", "maxLength": 300 },
+        "campaignId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "type", "points", "description", "createdAt"]
+    },
+    "Referral": {
+      "title": "Referral",
+      "description": "Direct and multi-level referral tracking record with anti-abuse activation threshold",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "referrerId": { "type": "string", "maxLength": 128 },
+        "refereeId": { "type": "string", "maxLength": 128 },
+        "refereeName": { "type": "string", "maxLength": 100 },
+        "level": { "type": "number" },
+        "pointsAwarded": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "active"] },
+        "tasksRequired": { "type": "number" },
+        "tasksCompletedByReferee": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "referrerId", "refereeId", "refereeName", "level", "pointsAwarded", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Stores user profiles and point wallets"
+    },
+    "/campaigns/{campaignId}": {
+      "schema": { "$ref": "#/entities/Campaign" },
+      "description": "Stores community promotion campaigns"
+    },
+    "/tasks/{taskId}": {
+      "schema": { "$ref": "#/entities/TaskLog" },
+      "description": "Stores task completion records"
+    },
+    "/transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/Transaction" },
+      "description": "Stores ledger of wallet point changes"
+    },
+    "/referrals/{referralId}": {
+      "schema": { "$ref": "#/entities/Referral" },
+      "description": "Stores referral reward history"
+    }
+  }
+}
