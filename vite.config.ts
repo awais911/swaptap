@@ -5,6 +5,7 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    base: '/swaptap/', // Yeh line add karni hai taake GitHub Pages par blank page na aaye
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
